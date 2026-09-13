@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Neverland Flight</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=Nunito:wght@600;800&display=swap');
+
+  :root {
+    --sky-top: #1B2A4A;
+    --sky-mid: #4A3B78;
+    --sky-horizon: #FF8A65;
+    --moon: #FFF4D6;
+    --star: #FFD766;
+    --pixie: #7EE8C7;
+    --peter-green: #3CA55C;
+    --skin: #F4C08A;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--sky-top);
+    font-family: 'Nunito', sans-serif;
+    touch-action: none;
+  }
+
+  #gameCanvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  #scoreBadge {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    background: rgba(27, 42, 74, 0.55);
+    backdrop-filter: blur(4px);
+    border: 2px solid var(--star);
+    border-radius: 999px;
+    padding: 8px 20px 8px 14px;
+    color: var(--star);
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  #hint {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,244,214,0.85);
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 1s ease;
+    z-index: 5;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  #toast {
+    position: fixed;
+    top: 22%;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--moon);
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  #titleScreen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    background: radial-gradient(ellipse at 50% 30%, rgba(74,59,120,0.4), rgba(27,42,74,0.85));
+    text-align: center;
+    padding: 24px;
+  }
+
+  #titleScreen h1 {
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 700;
+    font-size: clamp(36px, 9vw, 64px);
+    color: var(--moon);
+    margin: 0 0 6px 0;
+    text-shadow: 0 3px 14px rgba(0,0,0,0.5);
+  }
+
+  #titleScreen p.sub {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    color: var(--pixie);
+    font-size: clamp(15px, 4vw, 19px);
+    margin: 0 0 28px 0;
+    max-width: 440px;
+  }
+
+  #playBtn {
+    font-family: 'Baloo 2', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: #16321F;
+    background: linear-gradient(180deg, #8FE0AA, var(--peter-green));
+    border: none;
+    border-radius: 999px;
+    padding: 16px 52px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #2A7A41, 0 10px 24px rgba(0,0,0,0.35);
+    transition: transform 0.12s ease;
+  }
+  #playBtn:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #2A7A41, 0 6px 14px rgba(0,0,0,0.35);
+  }
+
+  #controlsInfo {
+    margin-top: 26px;
+    font-family: 'Nunito', sans-serif;
+    font-weight: 600;
+    color: rgba(255,244,214,0.75);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<div id="scoreBadge">⭐ <span id="scoreVal">0</span></div>
+<div id="hint">Use arrow keys or drag on the screen to fly!</div>
+<div id="toast"></div>
+
+<div id="titleScreen">
+  <h1>Neverland Flight</h1>
+  <p class="sub">Fly through the night sky, collect pixie dust stars, and soar through golden rings over Neverland!</p>
+  <button id="playBtn">Let's Fly!</button>
+  <div id="controlsInfo">🖥️ Arrow keys / WASD &nbsp;·&nbsp; 📱 Drag anywhere on screen</div>
+</div>
+
+<script>
+(function () {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const scoreVal = document.getElementById('scoreVal');
+  const hint = document.getElementById('hint');
+  const toast = document.getElementById('toast');
+  const titleScreen = document.getElementById('titleScreen');
+  const playBtn = document.getElementById('playBtn');
+
+  let W, H;
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // ---------- Audio (simple synthesized chimes, no external files) ----------
+  let audioCtx = null;
+  function getAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtx;
+  }
+  function chime(freq, duration, type = 'sine', gain = 0.14) {
+    try {
+      const ac = getAudio();
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      g.gain.value = gain;
+      osc.connect(g);
+      g.connect(ac.destination);
+      const now = ac.currentTime;
+      g.gain.setValueAtTime(gain, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc.start(now);
+      osc.stop(now + duration);
+    } catch (e) { /* audio not available, ignore */ }
+  }
+  function playCollectSound() {
+    chime(880, 0.18, 'sine', 0.15);
+    setTimeout(() => chime(1320, 0.2, 'sine', 0.12), 70);
+  }
+  function playRingSound() {
+    chime(660, 0.12, 'triangle', 0.14);
+    setTimeout(() => chime(990, 0.12, 'triangle', 0.14), 60);
+    setTimeout(() => chime(1320, 0.22, 'triangle', 0.14), 120);
+  }
+  function playBounceSound() {
+    chime(220, 0.18, 'sine', 0.1);
+  }
+
+  // ---------- Input ----------
+  const keys = {};
+  window.addEventListener('keydown', (e) => {
+    keys[e.key.toLowerCase()] = true;
+    if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
+  }, { passive: false });
+  window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+  let pointerActive = false;
+  let pointerX = 0, pointerY = 0;
+
+  function setPointer(x, y) {
+    pointerX = x; pointerY = y;
+  }
+  canvas.addEventListener('touchstart', (e) => {
+    pointerActive = true;
+    const t = e.touches[0];
+    setPointer(t.clientX, t.clientY);
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    const t = e.touches[0];
+    setPointer(t.clientX, t.clientY);
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', () => { pointerActive = false; }, { passive: false });
+
+  canvas.addEventListener('mousedown', (e) => { pointerActive = true; setPointer(e.clientX, e.clientY); });
+  canvas.addEventListener('mousemove', (e) => { if (pointerActive) setPointer(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', () => { pointerActive = false; });
+
+  // ---------- Game state ----------
+  let started = false;
+  let score = 0;
+  let t = 0; // global time counter
+  let hintShown = true;
+
+  const player = {
+    x: 0, y: 0, vx: 0, vy: 0,
+    radius: 22,
+    angle: 0,
+  };
+
+  let trail = [];
+  let bursts = [];
+  let stars = []; // collectible pixie-dust stars
+  let clouds = [];
+  let rings = [];
+  let bgStars = [];
+
+  function resetGame() {
+    player.x = W * 0.28;
+    player.y = H * 0.5;
+    player.vx = 0; player.vy = 0;
+    score = 0;
+    scoreVal.textContent = '0';
+    trail = [];
+    bursts = [];
+    stars = [];
+    clouds = [];
+    rings = [];
+    t = 0;
+    for (let i = 0; i < 6; i++) spawnCloud(Math.random() * W);
+    for (let i = 0; i < 5; i++) spawnStar(W + Math.random() * W);
+  }
+
+  function initBgStars() {
+    bgStars = [];
+    for (let i = 0; i < 90; i++) {
+      bgStars.push({
+        x: Math.random() * W,
+        y: Math.random() * H * 0.65,
+        r: Math.random() * 1.6 + 0.4,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.4 + Math.random() * 0.6,
+      });
+    }
+  }
+
+  function spawnCloud(x) {
+    clouds.push({
+      x: x !== undefined ? x : W + 120,
+      y: 60 + Math.random() * (H * 0.6),
+      scale: 0.7 + Math.random() * 1.1,
+      speed: 0.35 + Math.random() * 0.35,
+    });
+  }
+
+  function spawnStar(x) {
+    stars.push({
+      x: x !== undefined ? x : W + 60,
+      y: 60 + Math.random() * (H - 160),
+      collected: false,
+      phase: Math.random() * Math.PI * 2,
+      speed: 1.1 + Math.random() * 0.6,
+    });
+  }
+
+  function maybeSpawnRing() {
+    if (rings.length === 0 && Math.random() < 0.01) {
+      rings.push({
+        x: W + 100,
+        y: 80 + Math.random() * (H - 240),
+        r: 55,
+        passed: false,
+        speed: 1.3,
+      });
+    }
+  }
+
+  function showToast(text) {
+    toast.textContent = text;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(-50%) translateY(-6px)';
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+    }, 900);
+  }
+
+  const encouragements = ['Great flying!', 'Whoosh!', 'You\u2019re a natural!', 'Off to Neverland!', 'Magic dust!'];
+
+  // ---------- Update ----------
+  function update() {
+    t += 1;
+
+    // movement from keyboard
+    const accel = 0.9;
+    let ax = 0, ay = 0;
+    if (keys['arrowup'] || keys['w']) ay -= accel;
+    if (keys['arrowdown'] || keys['s']) ay += accel;
+    if (keys['arrowleft'] || keys['a']) ax -= accel;
+    if (keys['arrowright'] || keys['d']) ax += accel;
+
+    // movement from pointer (drag/touch)
+    if (pointerActive) {
+      const dx = pointerX - player.x;
+      const dy = pointerY - player.y;
+      ax += dx * 0.006;
+      ay += dy * 0.006;
+      if (hintShown) {
+        hintShown = false;
+        hint.style.opacity = '0';
+      }
+    }
+    if (ax !== 0 || ay !== 0) {
+      if (hintShown) {
+        hintShown = false;
+        hint.style.opacity = '0';
+      }
+    }
+
+    player.vx += ax;
+    player.vy += ay;
+    player.vx *= 0.9;
+    player.vy *= 0.9;
+    player.vx = Math.max(-9, Math.min(9, player.vx));
+    player.vy = Math.max(-9, Math.min(9, player.vy));
+
+    player.x += player.vx;
+    player.y += player.vy;
+
+    const margin = player.radius + 6;
+    player.x = Math.max(margin, Math.min(W - margin, player.x));
+    player.y = Math.max(margin, Math.min(H - margin, player.y));
+
+    player.angle = Math.max(-0.5, Math.min(0.5, player.vy * 0.05));
+
+    // trail
+    trail.push({ x: player.x - 18, y: player.y + 6, life: 1 });
+    if (trail.length > 40) trail.shift();
+    trail.forEach(p => p.life -= 0.035);
+    trail = trail.filter(p => p.life > 0);
+
+    // bursts (particle pops)
+    bursts.forEach(b => {
+      b.x += b.vx; b.y += b.vy; b.vy += 0.05; b.life -= 0.03;
+    });
+    bursts = bursts.filter(b => b.life > 0);
+
+    // bg stars twinkle
+    bgStars.forEach(s => { s.phase += 0.02 * s.speed; });
+
+    // clouds drift
+    clouds.forEach(c => { c.x -= c.speed; });
+    clouds = clouds.filter(c => c.x > -200);
+    if (Math.random() < 0.01) spawnCloud();
+
+    // cloud collision -> gentle bounce, no penalty
+    clouds.forEach(c => {
+      const cw = 90 * c.scale;
+      const dx = player.x - c.x;
+      const dy = player.y - c.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < cw * 0.55 + player.radius * 0.6) {
+        const push = 1.6;
+        player.vx += (dx / (dist || 1)) * push;
+        player.vy += (dy / (dist || 1)) * push;
+        if (t % 12 === 0) playBounceSound();
+      }
+    });
+
+    // stars drift + collection
+    stars.forEach(s => {
+      s.x -= s.speed;
+      s.phase += 0.08;
+      if (!s.collected) {
+        const dx = player.x - s.x;
+        const dy = player.y - s.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < player.radius + 16) {
+          s.collected = true;
+          score += 10;
+          scoreVal.textContent = score;
+          playCollectSound();
+          showToast(encouragements[Math.floor(Math.random() * encouragements.length)]);
+          for (let i = 0; i < 10; i++) {
+            const ang = Math.random() * Math.PI * 2;
+            bursts.push({
+              x: s.x, y: s.y,
+              vx: Math.cos(ang) * (Math.random() * 3 + 1),
+              vy: Math.sin(ang) * (Math.random() * 3 + 1),
+              life: 1, color: 'star'
+            });
+          }
+        }
+      }
+    });
+    stars = stars.filter(s => s.x > -60 && !s.collected);
+    if (Math.random() < 0.02) spawnStar();
+
+    // rings
+    maybeSpawnRing();
+    rings.forEach(r => {
+      r.x -= r.speed;
+      if (!r.passed) {
+        const dx = player.x - r.x;
+        const dy = player.y - r.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < r.r) {
+          r.passed = true;
+          score += 25;
+          scoreVal.textContent = score;
+          playRingSound();
+          showToast('Ring bonus! +25');
+          for (let i = 0; i < 18; i++) {
+            const ang = (i / 18) * Math.PI * 2;
+            bursts.push({
+              x: r.x, y: r.y,
+              vx: Math.cos(ang) * 3,
+              vy: Math.sin(ang) * 3,
+              life: 1, color: 'pixie'
+            });
+          }
+        }
+      }
+    });
+    rings = rings.filter(r => r.x > -100);
+  }
+
+  // ---------- Draw ----------
+  function drawBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#0F1830');
+    grad.addColorStop(0.45, getComputedStyle(document.documentElement).getPropertyValue('--sky-top').trim());
+    grad.addColorStop(0.75, getComputedStyle(document.documentElement).getPropertyValue('--sky-mid').trim());
+    grad.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue('--sky-horizon').trim());
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // moon
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#FFF4D6';
+    ctx.beginPath();
+    ctx.arc(W * 0.82, H * 0.18, 46, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // bg stars
+    bgStars.forEach(s => {
+      const a = 0.4 + 0.5 * Math.abs(Math.sin(s.phase));
+      ctx.fillStyle = `rgba(255,244,214,${a})`;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // island silhouette (parallax, gentle)
+    const islandY = H * 0.86;
+    ctx.fillStyle = 'rgba(20,18,40,0.75)';
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(0, islandY + 40);
+    ctx.lineTo(W * 0.12, islandY);
+    ctx.lineTo(W * 0.22, islandY + 25);
+    ctx.lineTo(W * 0.35, islandY - 40);
+    ctx.lineTo(W * 0.5, islandY + 10);
+    ctx.lineTo(W * 0.68, islandY - 20);
+    ctx.lineTo(W * 0.82, islandY + 20);
+    ctx.lineTo(W, islandY - 10);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawClouds() {
+    clouds.forEach(c => {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      const s = c.scale;
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, 42 * s, 24 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(c.x - 34 * s, c.y + 8 * s, 30 * s, 18 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(c.x + 34 * s, c.y + 8 * s, 30 * s, 18 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(c.x, c.y - 14 * s, 26 * s, 16 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  function drawStars() {
+    stars.forEach(s => {
+      const bob = Math.sin(s.phase) * 4;
+      const y = s.y + bob;
+      ctx.save();
+      ctx.translate(s.x, y);
+      ctx.rotate(Math.sin(s.phase * 0.5) * 0.3);
+      drawStarShape(0, 0, 5, 13, 6, '#FFD766', '#FFF4D6');
+      ctx.restore();
+    });
+  }
+
+  function drawStarShape(cx, cy, spikes, outerR, innerR, fill, glow) {
+    ctx.save();
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    let rot = Math.PI / 2 * 3;
+    const step = Math.PI / spikes;
+    ctx.moveTo(cx, cy - outerR);
+    for (let i = 0; i < spikes; i++) {
+      let x = cx + Math.cos(rot) * outerR;
+      let y = cy + Math.sin(rot) * outerR;
+      ctx.lineTo(x, y);
+      rot += step;
+      x = cx + Math.cos(rot) * innerR;
+      y = cy + Math.sin(rot) * innerR;
+      ctx.lineTo(x, y);
+      rot += step;
+    }
+    ctx.lineTo(cx, cy - outerR);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRings() {
+    rings.forEach(r => {
+      ctx.save();
+      ctx.strokeStyle = '#FFD766';
+      ctx.lineWidth = 8;
+      ctx.shadowColor = '#FFD766';
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  function drawTrail() {
+    trail.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life) * 0.7;
+      ctx.fillStyle = '#7EE8C7';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4 * p.life + 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  function drawBursts() {
+    bursts.forEach(b => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, b.life);
+      ctx.fillStyle = b.color === 'pixie' ? '#7EE8C7' : '#FFD766';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  function drawPlayer() {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+
+    // faint glow
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#7EE8C7';
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // legs (tights)
+    ctx.fillStyle = '#2E7D46';
+    ctx.beginPath();
+    ctx.ellipse(-4, 16, 5, 12, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(6, 17, 5, 12, 0.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // tunic body
+    ctx.fillStyle = '#3CA55C';
+    ctx.beginPath();
+    ctx.moveTo(-14, 2);
+    ctx.lineTo(14, 2);
+    ctx.lineTo(10, 20);
+    ctx.lineTo(-10, 20);
+    ctx.closePath();
+    ctx.fill();
+
+    // arms outstretched (flying pose)
+    ctx.strokeStyle = '#F4C08A';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-10, 4);
+    ctx.lineTo(-30, -4);
+    ctx.moveTo(10, 4);
+    ctx.lineTo(30, -6);
+    ctx.stroke();
+
+    // head
+    ctx.fillStyle = '#F4C08A';
+    ctx.beginPath();
+    ctx.arc(0, -10, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // hair
+    ctx.fillStyle = '#7A4A2B';
+    ctx.beginPath();
+    ctx.arc(0, -14, 12, Math.PI, Math.PI * 2);
+    ctx.fill();
+
+    // hat
+    ctx.fillStyle = '#2E7D46';
+    ctx.beginPath();
+    ctx.moveTo(-11, -16);
+    ctx.lineTo(11, -16);
+    ctx.lineTo(4, -34);
+    ctx.closePath();
+    ctx.fill();
+    // feather
+    ctx.strokeStyle = '#FF6F61';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(4, -34);
+    ctx.quadraticCurveTo(14, -40, 20, -30);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function draw() {
+    drawBackground();
+    drawClouds();
+    drawTrail();
+    drawStars();
+    drawRings();
+    drawPlayer();
+    drawBursts();
+  }
+
+  function loop() {
+    if (started) {
+      update();
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  playBtn.addEventListener('click', () => {
+    getAudio(); // unlock audio on user gesture
+    initBgStars();
+    resetGame();
+    titleScreen.style.display = 'none';
+    started = true;
+    hint.style.opacity = '1';
+    hintShown = true;
+  });
+
+  initBgStars();
+  draw();
+  loop();
+})();
+</script>
+</body>
+</html>
